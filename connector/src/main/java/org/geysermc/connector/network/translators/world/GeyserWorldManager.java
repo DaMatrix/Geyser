@@ -42,7 +42,7 @@ public class GeyserWorldManager extends WorldManager {
     @Override
     public int getBlockAt(GeyserSession session, int x, int y, int z) {
         ChunkCache chunkCache = session.getChunkCache();
-        if (chunkCache != null) { //chunk cache can be null if the session is closed asynchronously
+        if (chunkCache != null) { // Chunk cache can be null if the session is closed asynchronously
             return chunkCache.getBlockAt(x, y, z);
         }
         return 0;
@@ -52,9 +52,9 @@ public class GeyserWorldManager extends WorldManager {
     public int[] getBiomeDataAt(GeyserSession session, int x, int z) {
         if (session.getConnector().getConfig().isCacheChunks()) {
             ChunkCache chunkCache = session.getChunkCache();
-            if (chunkCache != null) { //chunk cache can be null if the session is closed asynchronously
+            if (chunkCache != null) { // Chunk cache can be null if the session is closed asynchronously
                 Column column = chunkCache.getChunk(x, z);
-                if (column != null) { //column can be null if the server sent a partial chunk update before the first ground-up-continuous one
+                if (column != null) { // Column can be null if the server sent a partial chunk update before the first ground-up-continuous one
                     return column.getBiomeData();
                 }
             }
