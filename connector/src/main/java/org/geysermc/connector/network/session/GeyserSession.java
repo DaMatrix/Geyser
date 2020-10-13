@@ -107,8 +107,7 @@ public class GeyserSession implements CommandSender {
     private InventoryCache inventoryCache;
     private WorldCache worldCache;
     private WindowCache windowCache;
-    @Setter
-    private TeleportCache teleportCache;
+    private List<TeleportCache> pendingTeleports;
 
     @Getter
     private final Long2ObjectMap<ClientboundMapItemDataPacket> storedMaps = Long2ObjectMaps.synchronize(new Long2ObjectOpenHashMap<>());
@@ -642,17 +641,41 @@ public class GeyserSession implements CommandSender {
         upstream.sendPacket(startGamePacket);
     }
 
+    public void submitPendingTeleport(TeleportCache teleport)   {
+        List<TeleportCache> pendingTeleports = this.pendingTeleports;
+        if (pendingTeleports == null)   {
+            this.pendingTeleports = pendingTeleports = new ArrayList<>();
+        }
+        pendingTeleports.add(teleport);
+    }
+
     public boolean confirmTeleport(Vector3d position) {
-        if (teleportCache != null) {
-            if (!teleportCache.canConfirm(position)) {
-                GeyserConnector.getInstance().getLogger().debug("Unconfirmed Teleport " + teleportCache.getTeleportConfirmId()
-                        + " Ignore movement " + position + " expected " + teleportCache);
-                return false;
+        // This probably won't work if you teleport to position A, then to B, then back to A again in a single tick, but
+        // that's rather unlikely so this is fine for now...
+        if (this.pendingTeleports != null) {
+            int lastConfirmedTeleport = -1;
+            for (int i = 0, size = this.pendingTeleports.size(); i < size; i++)    {
+                if (this.pendingTeleports.get(i).canConfirm(position))  {
+                    // Confirm all teleports up to and including this one
+                    lastConfirmedTeleport = i;
+                }
             }
-            int teleportId = teleportCache.getTeleportConfirmId();
-            teleportCache = null;
-            ClientTeleportConfirmPacket teleportConfirmPacket = new ClientTeleportConfirmPacket(teleportId);
-            sendDownstreamPacket(teleportConfirmPacket);
+
+            for (int i = 0; i <= lastConfirmedTeleport; i++)    {
+                TeleportCache teleportCache = this.pendingTeleports.remove(0);
+                ClientTeleportConfirmPacket teleportConfirmPacket = new ClientTeleportConfirmPacket(teleportCache.getTeleportConfirmId());
+                sendDownstreamPacket(teleportConfirmPacket);
+            }
+
+            if (this.pendingTeleports.isEmpty())    {
+                this.pendingTeleports = null;
+            } else {
+                TeleportCache teleportCache = this.pendingTeleports.get(0);
+                GeyserConnector.getInstance().getLogger().debug("Unconfirmed Teleport " + teleportCache.getTeleportConfirmId()
+                                                                + " Ignore movement " + position + " expected " + teleportCache);
+            }
+
+            return lastConfirmedTeleport >= 0;
         }
         return true;
     }
